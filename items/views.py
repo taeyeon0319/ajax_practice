@@ -17,3 +17,16 @@ def create(request):
         user = request.user
         Post.objects.create(title=title, content=content, image=image,user=user)
     return redirect('main')
+
+def show(request, post_id):
+    post = get_object_or_404(Post, pk=post_id)
+    post.view_count = post.view_count+1
+    post.save()
+    return render(request, 'items/show.html', {'post':post})
+
+
+#삭제하기
+def delete(request,post_id):
+    post = get_object_or_404(Post, pk=post_id)
+    post.delete()
+    return redirect('main')
