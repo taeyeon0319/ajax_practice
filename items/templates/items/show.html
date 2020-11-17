@@ -22,7 +22,187 @@
     {% if post.user == user %}
         <a href="{% url 'items:delete' post.pk %}"> 삭제하기 </a>
     {% endif %}
-</div>
+
+    <span href="#" class="like" name ="{{post.id}}" value="Like"> 
+
+        {% if user in post.like_user_set.all %}
+            <div class="alt-service-icon">
+                <i class="fas fa-heart" id ="like-icon" style="color:red;"></i>
+             </div> 
     
+        {% else %}
+            <div class="alt-service-icon">
+                 <i class="far fa-heart" id ="like-icon" style="color:red;"></i> 
+            </div>
+    
+        {% endif %}
+    
+        <span id="count-{{ post.id }}" class="alt-services-title font-alt"> 
+            좋아요 
+            {% if post.likes_count == 0 %} 
+                0개 
+            {% else %}
+                {{ post.like_count }}개
+            {% endif %}
+        </span>
+    </span>
+
+    <br><br>
+    <span href="#" class="dislike" name ="{{post.id}}" value="Dislike"> 
+
+        {% if user in post.dislike_user_set.all %}
+            <div class="alt-service-icon">
+                <i class="fas fa-thumbs-down" id ="dislike-icon" style="color:blue;"></i>
+            </div> 
+
+        {% else %}
+            <div class="alt-service-icon">
+                <i class="far fa-thumbs-down" id ="dislike-icon" style="color:blue;"></i> 
+            </div>
+
+        {% endif %}
+
+        <span id="discount-{{ post.id }}" class="alt-services-title font-alt"> 
+            싫어요 
+            {% if post.dislike_count == 0 %} 
+                0개 
+            {% else %}
+                {{ post.dislike_count }}개
+            {% endif %}
+        </span>
+    </span>
+    <form action="#" method="POST" style="margin-top: 50px;" class="create-comment-form">
+        {% csrf_token %}
+        <div class="form-group">
+            <textarea class="form-control" name="content" id="comment-input-{{ post.pk }}" placeholder="댓글 작성..."></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary comment-submit-button" data-post-id="{{ post.pk }}">작성</button>
+    </form><br>
+    {% if comments %}
+        <ul class="list-group" id="comments-list-{{ post.pk }}" style="margin-top: 40px;">
+            {% for comment in comments %}
+                {% include 'comments/_comment.html' with comment=comment user=user %}
+            {% endfor %}
+        </ul>
+    {% endif %}
+    
+</div>
+
+<script src="https://code.jquery.com/jquery-3.2.1.min.js"></script>
+<script>
+    $(".like").click(function(){
+        var pk = $(this).attr('name')
+        $.ajax({
+            type: "POST",
+            url: "{% url 'items:like_toggle' post.pk %}",
+            data: {'pk':pk, 'csrfmiddlewaretoken': '{{ csrf_token }}'},
+            dataType:"json",
+
+            success: function(response){
+                if(response.like_count == null){
+                    alert("로그인이 필요합니다.");
+                    window.location.replace("/accounts/login");
+                }
+                else{
+                    if(response.result == "like"){
+                        $('#like-icon').removeClass();
+                        $('#like-icon').addClass('fas fa-heart');
+                    }
+                    else{
+                        $('#like-icon').removeClass();
+                        $('#like-icon').addClass('far fa-heart');
+                    }
+                    $('##count-{{ post.id }}').html('좋아요'+response.like_count+'개');
+                }
+            },
+
+            error: function(request, status, error){
+                alert("로그인이 필요합니다.") // +"\n"+"error:"+error)
+                // window.location.replace("/accounts/login/")
+                alert("code:"+request.status+"\n"+"message:"+request.responseText+"\n"+"error:"+error);
+            },
+        })
+    })
+
+    $(".dislike").click(function(){
+        var pk = $(this).attr('name')
+        $.ajax({
+            type:"POST",
+            url : "{% url 'items:dislike_toggle' post.pk %}",
+            data: { 'pk':pk, 'csrfmiddlewaretoken': '{{ csrf_token }}'},
+            dataType:"json",
+
+            success: function(response){
+                if (response.dislike_count==null){
+                    alert("로그인이 필요합니다.");
+                    window.location.replace('/accounts/login/');
+                }
+                else{
+                    if (response.result == "dislike"){
+                        $('#dislike-icon').removeClass();
+                        $('#dislike-icon').addClass('fas fa-thumbs-down');
+                    }
+                    else{
+                        $('#dislike-icon').removeClass();
+                        $('#dislike-icon').addClass('far fa-thumbs-down');
+                    }
+                    $('#discount-{{ post.id }}').html('싫어요'+response.dislike_count+'개');
+                }
+            },
+
+            error: function(request, status, error){
+                alert("로그인이 필요합니다.") // +"\n"+"error:"+error) 
+                // window.location.replace("/accounts/login/") 
+                alert("code:"+request.status+"\n"+"message:"+request.responseText+"\n"+"error:"+error); 
+            },
+        });
+    })
+
+    $('.comment-submit-button').click(function(e){
+        e.preventDefault(); //새로고침 막아줌
+        const postId = $(this).data('post-id');
+        const commentMessage = $(`#comment-input-${postId}`).val();
+        console.log(commentMessage)
+        if (commentMessage === '') {
+            alert('댓글 내용을 입력해주세요.');
+        } else {
+            $.ajax({
+                url: "{% url 'items:create_comment' post.pk %}",
+                type: "POST",
+                data: {
+                    'csrfmiddlewaretoken': '{{ csrf_token }}',
+                    'content': commentMessage
+                },
+                success: function(response) {
+                    $(`#comments-list-${postId}`).prepend(response.comment);
+                    $(`#comment-input-${postId}`).val('');
+                },
+                error: function(response) {
+                    alert('오류가 발생했습니다.');
+                }
+            });
+        }
+    });
+
+    $('.comment-delete-button').click(function(e){
+        e.preventDefault();
+        const deleteCommentButton = $(this);
+        const commentId = $(this).data('comment-id');
+        $.ajax({
+            url: `/items/${commentId}/delete_comment/`,
+            type: "POST",
+            data: {
+                'csrfmiddlewaretoken': '{{ csrf_token }}',
+            },
+            success: function(response) {
+                $(`#comment-${commentId}`).remove();
+            },
+            error: function(response) {
+                alert('오류가 발생했습니다.');
+            }
+        });
+    });
+
+</script>
 
 {% endblock %}
